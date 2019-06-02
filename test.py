@@ -8,12 +8,14 @@ from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
+
 from PIL import Image
 import matplotlib.pylab as plt
 from scipy import signal
 import numpy as np
 import time
 import random
+import os
 
 def get_image():
     '''
@@ -36,7 +38,7 @@ def get_image():
     page_snap_obj = Image.open('snap.png')
     #切割图片得到验证码
     crop_imag_obj = page_snap_obj.crop((left, top, right, bottom))
-    crop_imag_obj.save('crop.png')
+    # crop_imag_obj.save('crop.png')
     return crop_imag_obj
 
 def get_dist(img,N = 10):
@@ -53,11 +55,6 @@ def get_dist(img,N = 10):
     im = np.sum(im,axis=2)
     #得到滤波器之后的图片
     grad=signal.convolve2d(im,scharr,boundary='symm',mode='same')
-    # plt.subplot(2,1,1)
-    # plt.imshow(im)
-    # plt.subplot(2,1,2)
-    # plt.imshow(grad)
-    # plt.show()
     #把文字的作用去掉，所以从５０开始加
     grad = np.sum(grad[20:,:],axis = 0)
     min_to_max_indx = np.argsort(-abs(grad))
@@ -154,12 +151,14 @@ def main():
     try:
         driver.get('https://www.geetest.com/type/')
         #　步骤零点击滑动验证
+        time.sleep(1)
         button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, '#app>section>div>ul>li:nth-child(2)')))
         button.click()
         # 步骤一：先点击按钮，弹出图片
         time.sleep(2)
         button = wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'geetest_radar_tip')))
         button.click()
+        # 滑动验证
         huadong()
     except:
         main()
@@ -170,14 +169,22 @@ def main():
         while(flag):
             huadong()
             flag = refresh()
-        print('Yeah hoo!')
+            print('刷新一下，重新验证，不要慌')
+        print('验证成功！休息5s')
+        #删除保存的照片
+        if os.path.exists('snap.png'):
+            os.remove('snap.png')
 if __name__ == '__main__':
     #定义抓取浏览器
     driver = webdriver.Chrome()
-    driver.maximize_window()
+    options = webdriver.ChromeOptions()
+    options.add_argument('start-maximized')
+    # driver.maximize_window()
     wait = WebDriverWait(driver, 5)
-    while True:
+    for i in range(20):
         try:
             main()
+            time.sleep(5)
+        # 为了做ppt的视频效果
         except:
-            print('再尝试')
+            print('再尝试!')
