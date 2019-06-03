@@ -28,7 +28,7 @@ def get_image():
     time.sleep(2)  # 保证图片刷新出来
     localtion = img.location
     size = img.size
-    print(localtion,size)
+    # print(localtion,size)
     left = localtion['x']+1
     top = localtion['y']
     right = localtion['x'] + size['width']
@@ -48,15 +48,23 @@ def get_dist(img,N = 10):
     :return:
     '''
     #用来检测边缘
-    scharr=np.array([[-1,0,1],
-                     [-1,0,1],
-                     [-1,0,1]])
+    scharr=np.array([[-3,0,3],
+                     [-3,0,3],
+                     [-3,0,3],
+                     [-3,0,3],
+                     [-3,0,3],
+                     [-3,0,3],
+                     [-3,0,3]])
     im = np.array(img.convert('RGB'))
     im = np.sum(im,axis=2)
     #得到滤波器之后的图片
     grad=signal.convolve2d(im,scharr,boundary='symm',mode='same')
+    plt.figure()
+    plt.imshow(grad)
+    plt.savefig('after-filter.png')
+
     #把文字的作用去掉，所以从５０开始加
-    grad = np.sum(grad[20:,:],axis = 0)
+    grad = np.sum(grad[32:,:],axis = 0)
     min_to_max_indx = np.argsort(-abs(grad))
     positive = []
     for i in range(N):
@@ -89,7 +97,7 @@ def get_tracks(distance):
     # 初速度
     v = 0
     # 单位时间为0.2s来统计轨迹，轨迹即0.2内的位移
-    t = 0.3
+    t = 0.1
     # 位移/轨迹列表，列表内的一个元素代表0.2s的位移
     tracks = []
     # 当前的位移
@@ -112,6 +120,10 @@ def get_tracks(distance):
         tracks.append(round(s))
         # 速度已经达到v,该速度作为下次的初速度
         v = v0 + a * t
+    #加入暂停，是否会减少被误判的概率,----测试后发现减少了
+    stop = random.randint(len(tracks)//4,round(len(tracks)*2/5))
+    tracks = tracks[:stop] + [0,0,0,0] + tracks[stop:]
+    tracks.append(distance-sum(tracks))
     return tracks
 def huadong():
     image1 = get_image()
@@ -119,7 +131,7 @@ def huadong():
     distance = get_dist(image1)
     # 步骤三：模拟人的行为习惯（先匀加速拖动后匀减速拖动），把需要拖动的总距离分成一段一段小的轨迹
     tracks = get_tracks(distance)
-    print(tracks)
+    # print(tracks)
     # print(image1.size)
     print(distance, sum(tracks))
     # 步骤四：按照轨迹拖动，完全验证
@@ -163,28 +175,28 @@ def main():
     except:
         main()
     finally:
-        time.sleep(2)
+        time.sleep(1)
         #检测一下是否成功如果失败重新来一次
         flag = refresh()
         while(flag):
             huadong()
             flag = refresh()
             print('刷新一下，重新验证，不要慌')
-        print('验证成功！休息5s')
+        print('验证成功！休息3s')
         #删除保存的照片
         if os.path.exists('snap.png'):
             os.remove('snap.png')
 if __name__ == '__main__':
     #定义抓取浏览器
-    driver = webdriver.Chrome()
     options = webdriver.ChromeOptions()
     options.add_argument('start-maximized')
+    driver = webdriver.Chrome(options=options)
     # driver.maximize_window()
     wait = WebDriverWait(driver, 5)
     for i in range(20):
         try:
             main()
-            time.sleep(5)
+            time.sleep(3)
         # 为了做ppt的视频效果
         except:
             print('再尝试!')
