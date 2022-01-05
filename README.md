@@ -40,9 +40,9 @@ matplotlib
 
    ```python
    # 默认测试为网易易盾
-   python hdyzm-master/main.py
+   python main.py
    # 也可以指定测试网站，目前额外只支持极验验滑动证码测试
-   python hdyzm-master/main.py --name jiyan
+   python main.py --name jiyan
    ```
 
 ### 常见问题
