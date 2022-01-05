@@ -7,28 +7,24 @@
 
 import random
 from selenium.webdriver import ActionChains
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.wait import WebDriverWait
 from PIL import Image
 import numpy as np
 from scipy import signal
 import requests
 import time
 import matplotlib.pylab as plt
-
-
-def download_form_url(url, path, size):
-    response = requests.get(url)
-    with open(path, "wb") as f:
-        f.write(response.content)
-    img = Image.open(path).resize(size)
-    img.save(path)
-    return path
+import base64
 
 
 def valid_test_img_show(img, distance):
     plt.figure
     plt.imshow(img)
-    plt.axvline(distance)
-    plt.savefig('hdyzm-master/imgs/valid.png')
+    plt.axvline(distance, color="r")
+    plt.savefig("imgs/valid.png")
     # plt.show()
 
 
@@ -75,21 +71,71 @@ def get_tracks(distance):
     tracks.append(distance - sum(tracks))
     return tracks
 
+
 class Slider:
-    def __init__(
-        self, driver, background_item, slider_item, slider_btn, method="defaulat"
-    ) -> None:
-        self.driver = driver
-        self.background_item = background_item
-        self.slider_item = slider_item
-        self.slider_btn = slider_btn
-        self.method = method
-        self.offset = 8  # offset
+    def __init__(self, cfg) -> None:
+
+        options = webdriver.ChromeOptions()
+        options.add_argument("start-maximized")
+        self.driver = webdriver.Chrome(
+            options=options, executable_path=cfg.executable_path
+        )
+        # prepare to do
+        self._prepare(cfg)
+
+
+    def _prepare(self, cfg):
+        # 初始化浏览器
+        wait = WebDriverWait(self.driver, 5)
+        # 点击对应标签
+        self.driver.get(cfg.TEST_URL)
+        button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, cfg.HD_SELECOTR)))
+        button.click()
+        self.tc_item = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, cfg.TC_SELECOTR)))
+        self.tc_item.click()
+
+        # 得到背景和滑块的item, 以及滑动按钮
+        time.sleep(2)
+        self.background_item = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, cfg.BG_SELECOTR))
+        )
+        self.slider_item = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, cfg.HK_SELECOTR))
+        )
+        self.slider_btn = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, cfg.HD_BTN)))
+
+        self.offset = cfg.offset
+        self.background_path = cfg.background_path
+        self.slider_path = cfg.slider_path
+
+
+
+    def _download_img(self, selenium_item, path, size):
+        url = selenium_item.get_attribute("src")
+        if url is not None:
+            response = requests.get(url)
+            with open(path, "wb") as f:
+                f.write(response.content)
+            img = Image.open(path).resize(size)
+            img.save(path)
+        # use js to download picture
+        else:
+            class_name = selenium_item.get_attribute("class")
+            # 下面的js代码根据canvas文档说明而来
+            js_cmd = (
+                'return document.getElementsByClassName("%s")[0].toDataURL("image/png");'
+                % class_name
+            )
+            # 执行 JS 代码并拿到图片 base64 数据
+            im_info = self.driver.execute_script(js_cmd)  # 执行js文件得到带图片信息的图片数据
+            im_base64 = im_info.split(",")[1]  # 拿到base64编码的图片信息
+            im_bytes = base64.b64decode(im_base64)  # 转为bytes类型
+            with open(path, "wb") as f:  # 保存图片到本地
+                f.write(im_bytes)
+            img = Image.open(path).resize(size)
+            img.save(path)
 
     def _download_images(self):
-        backgroud_url = self.background_item.get_attribute("src")
-        slider_url = self.slider_item.get_attribute("src")
-        print(backgroud_url, slider_url)
         # mark the size of background picture
         backgroud_size = (
             self.background_item.size["width"],
@@ -97,17 +143,15 @@ class Slider:
         )
         slider_size = self.slider_item.size["width"], self.slider_item.size["height"]
         # download img
-        download_form_url(
-            backgroud_url, "hdyzm-master/imgs/background.png", backgroud_size
-        )
-        download_form_url(slider_url, "hdyzm-master/imgs/slider.png", slider_size)
+        self._download_img(self.background_item, self.background_path, backgroud_size)
+        self._download_img(self.slider_item, self.slider_path, slider_size)
 
     def get_distance_by_default(self):
         # download pictures
         self._download_images()
         # load the picture
-        backgroud_img = Image.open("hdyzm-master/imgs/background.png").convert("L")
-        slider_img = Image.open("hdyzm-master/imgs/slider.png").convert("L")
+        backgroud_img = Image.open(self.background_path).convert("L")
+        slider_img = Image.open(self.slider_path).convert("L")
         backgroud_img = np.array(backgroud_img)
         slider_img = np.array(slider_img)
         # covld
@@ -119,11 +163,11 @@ class Slider:
         # 得到距离
         cols_sum = np.sum(grad, axis=0)
         # desc
-        sorted_sum = np.argsort(-cols_sum)
-        distance = sorted_sum[0]
+        sorted_sum = np.argsort(-np.abs(cols_sum))
+        distance = np.min(sorted_sum[:2])
         # show the distance on background
         valid_test_img_show(backgroud_img, distance)
-        return distance + self.offset  - left
+        return distance + self.offset - left
 
     def run(self):
         distance = self.get_distance_by_default()
@@ -133,11 +177,13 @@ class Slider:
         ActionChains(self.driver).click_and_hold(self.slider_btn).perform()
         for t in tracks:
             ActionChains(self.driver, duration=5).move_by_offset(t, 0).perform()
-        # time.sleep(0.7)
-        # fore = random.randint(0, 7)
-        # ActionChains(self.driver, duration=5).move_by_offset(fore, 0).perform()
-        # time.sleep(0.6)
-        # ActionChains(self.driver, duration=5).move_by_offset(-fore, 0).perform()
-        time.sleep(0.2)
+        
+        fore = random.randint(0, 7)
+        time.sleep(fore*0.1)
+        ActionChains(self.driver, duration=5).move_by_offset(fore, 0).perform()
+        time.sleep(fore*0.1)
+        ActionChains(self.driver, duration=5).move_by_offset(-fore, 0).perform()
         ActionChains(self.driver, duration=5).release().perform()
+        
         time.sleep(2)
+        self.driver.close()
