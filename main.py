@@ -4,7 +4,7 @@
 @Author  :   yylime
 @Contact :   844202100@qq.com
 """
-from numpy.testing._private.utils import clear_and_catch_warnings
+
 from utils import Slider
 from setting import Config
 import argparse
@@ -12,7 +12,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--name",
-    default="yidun",
+    default="jiyan",
     type=str,
     help="find useful name in setting.py",
 )

@@ -77,9 +77,16 @@ class Slider:
 
         options = webdriver.ChromeOptions()
         options.add_argument("start-maximized")
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option('excludeSwitches', ['enable-automation'])
+        options.add_experimental_option('useAutomationExtension', False)
+
         self.driver = webdriver.Chrome(
             options=options, executable_path=cfg.executable_path
         )
+        self.driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+        'source': 'Object.defineProperty(navigator, "webdriver", {get: () => undefined})'
+        })
         # prepare to do
         self._prepare(cfg)
 
@@ -164,26 +171,30 @@ class Slider:
         cols_sum = np.sum(grad, axis=0)
         # desc
         sorted_sum = np.argsort(-np.abs(cols_sum))
-        distance = np.min(sorted_sum[:2])
+        distance = np.min(sorted_sum[:4])
         # show the distance on background
-        valid_test_img_show(backgroud_img, distance)
+        # valid_test_img_show(backgroud_img, distance)
         return distance + self.offset - left
 
     def run(self):
+        fore = random.randint(0, 15)
         distance = self.get_distance_by_default()
-        tracks = get_tracks(distance)
+        tracks = get_tracks(distance + fore)
 
         # 开始滑动
         ActionChains(self.driver).click_and_hold(self.slider_btn).perform()
+        time.sleep(random.randint(0, 10) * 0.1)
         for t in tracks:
             ActionChains(self.driver, duration=5).move_by_offset(t, 0).perform()
-        
-        fore = random.randint(0, 7)
-        time.sleep(fore*0.1)
-        ActionChains(self.driver, duration=5).move_by_offset(fore, 0).perform()
-        time.sleep(fore*0.1)
-        ActionChains(self.driver, duration=5).move_by_offset(-fore, 0).perform()
-        ActionChains(self.driver, duration=5).release().perform()
-        
+        time.sleep(random.randint(0, 10) * 0.1)
+
+        # 反拉
+        tracks = get_tracks(fore)
+        for t in tracks:
+            ActionChains(self.driver).move_by_offset(-t, 0).perform()
+
+        time.sleep(random.randint(0, 10) * 0.1)
+        ActionChains(self.driver).release().perform()
+
         time.sleep(2)
         self.driver.close()

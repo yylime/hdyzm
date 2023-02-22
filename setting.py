@@ -19,7 +19,7 @@ class Config:
             self.HK_SELECOTR = ".yidun_jigsaw"  # 滑块
             self.HD_BTN = ".yidun_slider"  # 滑动按钮
 
-            self.offset = 8
+            self.offset = -8
 
         elif name == 'jiyan':
             self.TEST_URL = "https://www.geetest.com/en/demo"
